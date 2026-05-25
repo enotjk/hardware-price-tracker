@@ -1,0 +1,169 @@
+# Общая сеть — все контейнеры видят друг друга по имени сервиса
+networks:
+  tracker-net:
+    driver: bridge
+
+# Volumes — папки где хранятся данные между перезапусками
+volumes:
+  postgres-data:      # данные PostgreSQL не теряются при docker-compose down
+  airflow-logs:       # логи Airflow
+  pgadmin-data:       # настройки pgAdmin сохраняются между перезапусками
+
+services:
+
+  # ─────────────────────────────────────────
+  # PostgreSQL — локальная база для разработки
+  # В продакшне используем Supabase, но локально
+  # нужна своя БД чтобы не засорять облако
+  # ─────────────────────────────────────────
+  postgres:
+    image: postgres:15
+    container_name: tracker-postgres
+    networks:
+      - tracker-net
+    environment:
+      POSTGRES_USER: tracker
+      POSTGRES_PASSWORD: tracker123
+      POSTGRES_DB: hardware_tracker
+    ports:
+      - "5432:5432"       # твой Mac:контейнер
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # Redis — нужен Airflow для очереди задач
+  # Ничего настраивать не нужно, просто должен работать
+  # ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: tracker-redis
+    networks:
+      - tracker-net
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # Airflow — инициализация БД (запускается один раз)
+  # Создаёт все внутренние таблицы Airflow в postgres
+  # После успешного запуска завершается сам
+  # ─────────────────────────────────────────
+  airflow-init:
+    image: apache/airflow:2.8.1
+    container_name: tracker-airflow-init
+    networks:
+      - tracker-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://tracker:tracker123@postgres/hardware_tracker
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    command: >
+      bash -c "airflow db migrate && airflow users create
+      --username admin --password admin
+      --firstname Admin --lastname User
+      --role Admin --email admin@example.com"
+
+  # ─────────────────────────────────────────
+  # Airflow Scheduler — следит за расписанием DAGов
+  # Запускает задачи когда пришло время
+  # ─────────────────────────────────────────
+  airflow-scheduler:
+    image: apache/airflow:2.8.1
+    container_name: tracker-airflow-scheduler
+    networks:
+      - tracker-net
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://tracker:tracker123@postgres/hardware_tracker
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    volumes:
+      - ./etl/dags:/opt/airflow/dags       # твои DAG файлы → внутрь контейнера
+      - airflow-logs:/opt/airflow/logs
+    command: scheduler
+
+  # ─────────────────────────────────────────
+  # Airflow Webserver — UI на localhost:8080
+  # Здесь видишь DAGи, запускаешь вручную, смотришь логи
+  # ─────────────────────────────────────────
+  airflow-webserver:
+    image: apache/airflow:2.8.1
+    container_name: tracker-airflow-webserver
+    networks:
+      - tracker-net
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://tracker:tracker123@postgres/hardware_tracker
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    volumes:
+      - ./etl/dags:/opt/airflow/dags
+      - airflow-logs:/opt/airflow/logs
+    ports:
+      - "8080:8080"       # открывай localhost:8080 в браузере
+    command: webserver
+
+  # ─────────────────────────────────────────
+  # pgAdmin — визуальный интерфейс для PostgreSQL
+  # Открывай localhost:5050 чтобы смотреть таблицы и писать SQL
+  # ─────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: tracker-pgadmin
+    networks:
+      - tracker-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@tracker.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"       # открывай localhost:5050 в браузере
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+
+  # ─────────────────────────────────────────
+  # FastAPI — твой бэкенд API
+  # Перезапускается автоматически при изменении кода (--reload)
+  # ─────────────────────────────────────────
+  fastapi:
+    image: python:3.11-slim
+    container_name: tracker-fastapi
+    networks:
+      - tracker-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - ./api:/app                          # твоя папка api/ → внутрь контейнера
+    ports:
+      - "8000:8000"       # открывай localhost:8000/docs в браузере
+    environment:
+      DATABASE_URL: postgresql://tracker:tracker123@postgres:5432/hardware_tracker
+    command: >
+      bash -c "pip install fastapi uvicorn sqlalchemy psycopg2-binary --quiet &&
+               uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
