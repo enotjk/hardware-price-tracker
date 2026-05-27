@@ -192,4 +192,4 @@ if __name__ == "__main__":
     amounts = [100, 500, 1000, 1899]
     for amount in amounts:
         usd = client.convert(amount, "EUR")
-        print(f"  {amount} EUR = {usd} USD")
+        print(f"  {amount} EUR = {usd} USD")    
