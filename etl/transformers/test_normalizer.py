@@ -40,8 +40,8 @@ cursor.close()
 print(f"\nЗагружено {len(products)} продуктов из dim_products")
 
 # Инициализируем трансформер
-from exchange_rates import ExchangeRateClient
-exchange = ExchangeRateClient()
+import exchange_rates
+exchange = exchange_rates.ExchangeRateClient()
 normalizer = Normalizer(products, exchange)
 deduplicator = Deduplicator()
 
