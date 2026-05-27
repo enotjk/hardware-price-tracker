@@ -1,0 +1,23 @@
+# Database
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.30
+
+# API
+fastapi==0.111.0
+uvicorn==0.29.0
+pydantic==2.7.1
+
+# ETL
+requests==2.31.0
+pandas==2.2.2
+python-dotenv==1.0.1
+
+# eBay / Exchange rates
+pytrends==4.9.2
+
+# Airflow — только для разработки локально
+# apache-airflow устанавливается отдельно (см. ниже)
+
+# dbt
+dbt-core==1.8.0
+dbt-postgres==1.8.0
