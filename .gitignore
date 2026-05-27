@@ -1,3 +1,20 @@
+# env файлы — никогда не коммитить ключи!
+.env
+.env.local
+.env.production
+
+# Node.js
+node_modules/
+frontend/.next/
+frontend/out/
+
+# dbt
+etl/dbt/target/
+etl/dbt/dbt_packages/
+
+# Docker
+*.log
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -216,4 +233,3 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-.DS_Store
