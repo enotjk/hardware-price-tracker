@@ -101,6 +101,26 @@ services:
       - airflow-logs:/opt/airflow/logs
     command: scheduler
 
+
+# Airflow Worker —  выполняет задачи из очереди
+  airflow-worker:
+    image: apache/airflow:2.8.1
+    container_name: tracker-airflow-worker
+    networks:
+      - tracker-net
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://tracker:tracker123@postgres/hardware_tracker
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    volumes:
+      - ./etl/dags:/opt/airflow/dags
+      - airflow-logs:/opt/airflow/logs
+    command: celery worker
+
   # ─────────────────────────────────────────
   # Airflow Webserver — UI на localhost:8080
   # Здесь видишь DAGи, запускаешь вручную, смотришь логи

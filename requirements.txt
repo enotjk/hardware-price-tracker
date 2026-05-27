@@ -16,7 +16,8 @@ python-dotenv==1.0.1
 pytrends==4.9.2
 
 # Airflow — только для разработки локально
-# apache-airflow устанавливается отдельно (см. ниже)
+# apache-airflow устанавливается отдельно
+#apache-airflow==2.8.1
 
 # dbt
 dbt-core==1.8.0
