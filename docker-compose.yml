@@ -22,9 +22,9 @@ services:
     networks:
       - tracker-net
     environment:
-      POSTGRES_USER: tracker
-      POSTGRES_PASSWORD: tracker123
-      POSTGRES_DB: hardware_tracker
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"       # твой Mac:контейнер
     volumes:
@@ -138,8 +138,8 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@tracker.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_DEFAULT_EMAIL: ${POSTGRES_USER}
+      PGADMIN_DEFAULT_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5050:80"       # открывай localhost:5050 в браузере
     volumes:
