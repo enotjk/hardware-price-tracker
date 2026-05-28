@@ -10,7 +10,6 @@ import logging
 import re
 from dataclasses import dataclass
 from typing import Optional
-from uuid import UUID
 
 log = logging.getLogger(__name__)
 
@@ -46,14 +45,10 @@ class Normalizer:
         """
         Args:
             products:        список продуктов из dim_products
-                             [{"product_id": uuid, "name": str, "model_number": str, ...}]
             exchange_client: экземпляр ExchangeRateClient
         """
         self.products = products
         self.exchange = exchange_client
-
-        # Строим индекс для быстрого поиска продукта по ключевым словам
-        # { "RTX 4090": product_dict, "RX 7900 XTX": product_dict, ... }
         self._product_index = self._build_index(products)
 
     # ─────────────────────────────────────
@@ -81,18 +76,20 @@ class Normalizer:
     def find_product(self, title: str) -> Optional[dict]:
         """
         Ищет продукт в индексе по названию листинга.
-        Перебирает все ключи и ищет вхождение в title.
+
+        Стратегия:
+        1. Точный поиск — model_number целиком в title (GPU/CPU)
+        2. Токенный поиск — все слова из model_number есть в title (RAM)
 
         Args:
-            title: название листинга из API, например
-                   "ASUS ROG STRIX GeForce RTX 4090 OC 24GB GDDR6X"
+            title: название листинга из API
 
         Returns:
             dict продукта или None если не найден
         """
         normalized_title = self._normalize_text(title)
 
-        # Ищем model_number в названии листинга
+        # Шаг 1: точный поиск по model_number
         # Сортируем по длине — более длинные модели проверяем первыми
         # чтобы "RTX 4070 Ti Super" нашёлся раньше чем "RTX 4070"
         sorted_keys = sorted(self._product_index.keys(), key=len, reverse=True)
@@ -100,7 +97,21 @@ class Normalizer:
         for key in sorted_keys:
             if key in normalized_title:
                 product = self._product_index[key]
-                log.debug(f"Найден продукт: '{key}' в '{title[:50]}...'")
+                log.debug(f"Найден продукт (точный): '{key}' в '{title[:50]}...'")
+                return product
+
+        # Шаг 2: токенный поиск для RAM
+        # "ddr5 6000 32gb" → проверяем что все три слова есть в title
+        for key, product in self._product_index.items():
+            if product.get("category") != "RAM":
+                continue
+
+            tokens = key.split()
+            if len(tokens) < 2:
+                continue
+
+            if all(token in normalized_title for token in tokens):
+                log.debug(f"Найден продукт (токены {tokens}): '{title[:50]}...'")
                 return product
 
         log.warning(f"Продукт не найден для: '{title[:60]}...'")
@@ -111,9 +122,9 @@ class Normalizer:
     # ─────────────────────────────────────
     def normalize(
         self,
-        listing,                    # PriceListing из ebay.py
+        listing,
         source_id: int,
-        date_id: str,               # YYYY-MM-DD
+        date_id: str,
         etl_run_id: Optional[str] = None,
         raw_price_id: Optional[str] = None,
     ) -> Optional[NormalizedPrice]:
@@ -130,7 +141,7 @@ class Normalizer:
         # 2. Найти продукт в справочнике
         product = self.find_product(listing.title)
         if not product:
-            return None  # не знаем этот товар — пропускаем
+            return None
 
         # 3. Конвертация цены в USD
         if listing.currency == "USD":
@@ -188,7 +199,6 @@ class Normalizer:
     # ─────────────────────────────────────
     def _is_valid(self, listing) -> bool:
         """Проверяет что листинг валиден перед обработкой"""
-
         if not listing.title:
             log.debug("Пропуск: пустой title")
             return False
