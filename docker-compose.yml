@@ -73,6 +73,21 @@ services:
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      PYTHONPATH: /opt/airflow
+      # eBay
+      EBAY_CLIENT_ID: ${EBAY_CLIENT_ID}
+      EBAY_CLIENT_SECRET: ${EBAY_CLIENT_SECRET}
+      EBAY_ENVIRONMENT: production
+      # Exchange rates
+      EXCHANGE_RATE_API_KEY: ${EXCHANGE_RATE_API_KEY}
+      # Database
+      DIRECT_URL: ${DIRECT_URL}
+    volumes:
+      - ./etl/dags:/opt/airflow/dags
+      - ./etl/extractors:/opt/airflow/extractors
+      - ./etl/transformers:/opt/airflow/transformers
+      - ./etl/db:/opt/airflow/db
+      - airflow-logs:/opt/airflow/logs
     command: >
       bash -c "airflow db migrate && airflow users create
       --username admin --password admin
@@ -96,8 +111,20 @@ services:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      PYTHONPATH: /opt/airflow
+      # eBay
+      EBAY_CLIENT_ID: ${EBAY_CLIENT_ID}
+      EBAY_CLIENT_SECRET: ${EBAY_CLIENT_SECRET}
+      EBAY_ENVIRONMENT: production
+      # Exchange rates
+      EXCHANGE_RATE_API_KEY: ${EXCHANGE_RATE_API_KEY}
+      # Database
+      DIRECT_URL: ${DIRECT_URL}
     volumes:
-      - ./etl/dags:/opt/airflow/dags       # твои DAG файлы → внутрь контейнера
+      - ./etl/dags:/opt/airflow/dags
+      - ./etl/extractors:/opt/airflow/extractors
+      - ./etl/transformers:/opt/airflow/transformers
+      - ./etl/db:/opt/airflow/db
       - airflow-logs:/opt/airflow/logs
     command: scheduler
 
@@ -116,8 +143,20 @@ services:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      PYTHONPATH: /opt/airflow
+      # eBay
+      EBAY_CLIENT_ID: ${EBAY_CLIENT_ID}
+      EBAY_CLIENT_SECRET: ${EBAY_CLIENT_SECRET}
+      EBAY_ENVIRONMENT: production
+      # Exchange rates
+      EXCHANGE_RATE_API_KEY: ${EXCHANGE_RATE_API_KEY}
+      # Database
+      DIRECT_URL: ${DIRECT_URL}
     volumes:
       - ./etl/dags:/opt/airflow/dags
+      - ./etl/extractors:/opt/airflow/extractors
+      - ./etl/transformers:/opt/airflow/transformers
+      - ./etl/db:/opt/airflow/db
       - airflow-logs:/opt/airflow/logs
     command: celery worker
 
@@ -138,8 +177,20 @@ services:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      PYTHONPATH: /opt/airflow
+      # eBay
+      EBAY_CLIENT_ID: ${EBAY_CLIENT_ID}
+      EBAY_CLIENT_SECRET: ${EBAY_CLIENT_SECRET}
+      EBAY_ENVIRONMENT: production
+      # Exchange rates
+      EXCHANGE_RATE_API_KEY: ${EXCHANGE_RATE_API_KEY}
+      # Database
+      DIRECT_URL: ${DIRECT_URL}
     volumes:
       - ./etl/dags:/opt/airflow/dags
+      - ./etl/extractors:/opt/airflow/extractors
+      - ./etl/transformers:/opt/airflow/transformers
+      - ./etl/db:/opt/airflow/db
       - airflow-logs:/opt/airflow/logs
     ports:
       - "8080:8080"       # открывай localhost:8080 в браузере

@@ -5,6 +5,7 @@ Normalizer — нормализация сырых данных из API
 - Конвертирует цену в USD через ExchangeRateClient
 - Возвращает готовую запись для fact_price_history
 """
+from __future__ import annotations
 
 import logging
 import re

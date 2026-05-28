@@ -3,6 +3,7 @@
 Используем DIRECT_URL (без pgbouncer) для прямых запросов из Python скриптов.
 DATABASE_URL (с pgbouncer) будет использоваться только в продакшне на Railway.
 """
+from __future__ import annotations
 
 import os
 import logging

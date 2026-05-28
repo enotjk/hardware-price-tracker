@@ -5,6 +5,7 @@ Deduplicator — убирает дубли перед вставкой в БД
 - Убирает дубли внутри одного батча (один продукт может встретиться дважды)
 - Оставляет запись с минимальной ценой если дубли есть
 """
+from __future__ import annotations
 
 import logging
 from collections import defaultdict

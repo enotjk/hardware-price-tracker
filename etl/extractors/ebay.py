@@ -8,6 +8,7 @@ eBay Browse API клиент
 - Возвращает список листингов с ценами
 - Поддерживает США (ebay.com) и Германию (ebay.de)
 """
+from __future__ import annotations
 
 import os
 import time

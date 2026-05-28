@@ -4,6 +4,7 @@ Writer — сохранение данных в PostgreSQL (Supabase)
   - raw_prices: сырые JSON данные из API (никогда не удаляем)
   - fact_price_history: нормализованные цены для аналитики
 """
+from __future__ import annotations
 
 import json
 import logging
