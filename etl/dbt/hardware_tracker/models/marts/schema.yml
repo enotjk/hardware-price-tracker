@@ -1,0 +1,17 @@
+version: 2
+
+models:
+  - name: mart_current_prices
+    columns:
+      - name: product_id
+        tests:
+          - not_null
+      - name: price_usd
+        tests:
+          - not_null
+
+  - name: mart_price_changes
+    columns:
+      - name: product_id
+        tests:
+          - not_null

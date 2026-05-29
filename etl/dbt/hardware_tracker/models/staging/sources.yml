@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: public
+    schema: public
+    tables:
+      - name: fact_price_history
+      - name: dim_products
+      - name: dim_sources
+      - name: raw_prices
+      - name: exchange_rates
+
