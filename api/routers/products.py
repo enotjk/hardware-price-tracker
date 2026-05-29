@@ -5,18 +5,19 @@ Products router — эндпоинты для работы с продуктам
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 from database import execute_query
+from schemas import ProductSchema, ProductListSchema
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
 
-@router.get("")
+@router.get("", response_model=list[ProductListSchema])
 async def get_products(
     category: Optional[str] = Query(None, description="GPU, CPU, RAM"),
     brand: Optional[str] = Query(None, description="NVIDIA, AMD, Intel"),
 ):
     """Список всех отслеживаемых продуктов с фильтрами"""
     sql = """
-        SELECT product_id, name, brand, category, model_number, msrp_usd, release_date
+        SELECT product_id::text, name, brand, category, model_number, msrp_usd, release_date
         FROM dim_products
         WHERE is_active = true
     """
@@ -35,11 +36,11 @@ async def get_products(
     return execute_query(sql, params or None)
 
 
-@router.get("/search")
-async def search_products(q: str = Query(..., min_length=2)):
-    """Поиск продуктов по названию"""
+@router.get("/search", response_model=list[ProductListSchema])
+async def search_products(q: str = Query(..., min_length=2, description="Поисковый запрос")):
+    """Поиск продуктов по названию — используется для autocomplete на фронте"""
     sql = """
-        SELECT product_id, name, brand, category, model_number, msrp_usd
+        SELECT product_id::text, name, brand, category, model_number, msrp_usd, release_date
         FROM dim_products
         WHERE is_active = true
           AND (name ILIKE %s OR model_number ILIKE %s)
@@ -50,14 +51,14 @@ async def search_products(q: str = Query(..., min_length=2)):
     return execute_query(sql, (pattern, pattern))
 
 
-@router.get("/{product_id}")
+@router.get("/{product_id}", response_model=ProductSchema)
 async def get_product(product_id: str):
-    """Детали конкретного продукта"""
+    """Детали конкретного продукта — используется для страницы продукта"""
     sql = """
-        SELECT product_id, name, brand, category, model_number,
+        SELECT product_id::text, name, brand, category, model_number,
                msrp_usd, tdp_watts, vram_gb, cores, release_date
         FROM dim_products
-        WHERE product_id = %s AND is_active = true
+        WHERE product_id = %s::uuid AND is_active = true
     """
     rows = execute_query(sql, (product_id,))
     if not rows:
