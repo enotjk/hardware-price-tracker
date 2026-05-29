@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import PriceChart from "@/components/PriceChart";
 import {
   getProducts,
@@ -83,7 +84,6 @@ const FLAG: Record<string, string> = {
 // ─────────────────────────────────────────
 
 export default function DashboardPage() {
-  // ── State ──
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -98,15 +98,12 @@ export default function DashboardPage() {
   const [historyDays, setHistoryDays] = useState(30);
 
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [loadingPrices, setLoadingPrices] = useState(false);
 
-  // ── Загрузка статистики и топ-муверов при старте ──
   useEffect(() => {
     getPipelineStats().then(setStats).catch(console.error);
     getPriceChanges().then(setTopMovers).catch(console.error);
   }, []);
 
-  // ── Поиск с дебаунсом ──
   useEffect(() => {
     if (searchQuery.length < 2) {
       setSearchResults([]);
@@ -125,11 +122,9 @@ export default function DashboardPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // ── Загрузка данных при выборе продукта ──
   const loadProductData = useCallback(
     async (product: Product, days: number) => {
       setLoadingHistory(true);
-      setLoadingPrices(true);
       try {
         const [history, prices] = await Promise.all([
           getPriceHistory(product.product_id, days),
@@ -141,7 +136,6 @@ export default function DashboardPage() {
         console.error(e);
       } finally {
         setLoadingHistory(false);
-        setLoadingPrices(false);
       }
     },
     []
@@ -159,7 +153,6 @@ export default function DashboardPage() {
     if (selectedProduct) loadProductData(selectedProduct, days);
   };
 
-  // ── Форматирование времени ──
   const formatLastUpdate = (iso: string | null) => {
     if (!iso) return "—";
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -168,12 +161,10 @@ export default function DashboardPage() {
     return `${Math.floor(diff / 1440)} д назад`;
   };
 
-  // ── Best price ──
   const bestPrice = currentPrices.length
     ? Math.min(...currentPrices.map((p) => parseFloat(p.price_usd)))
     : null;
 
-  // ── Топ рост/падение ──
   const topGainer = topMovers
     .filter((m) => m.price_change_pct && parseFloat(m.price_change_pct) > 0)
     .sort((a, b) => parseFloat(b.price_change_pct!) - parseFloat(a.price_change_pct!))[0];
@@ -184,13 +175,11 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
 
-      {/* ── Заголовок ── */}
       <div>
         <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
         <p className="text-gray-400 text-sm mt-1">Цены на GPU, CPU, RAM — США и Европа</p>
       </div>
 
-      {/* ── Метрики ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard
           label="Отслеживается"
@@ -205,29 +194,19 @@ export default function DashboardPage() {
         />
         <MetricCard
           label="Макс. рост (7д)"
-          value={
-            topGainer
-              ? `+${parseFloat(topGainer.price_change_pct!).toFixed(1)}%`
-              : "—"
-          }
+          value={topGainer ? `+${parseFloat(topGainer.price_change_pct!).toFixed(1)}%` : "—"}
           sub={topGainer?.product_name?.split(" ").slice(-2).join(" ")}
           accent="green"
         />
         <MetricCard
           label="Макс. падение (7д)"
-          value={
-            topLoser
-              ? `${parseFloat(topLoser.price_change_pct!).toFixed(1)}%`
-              : "—"
-          }
+          value={topLoser ? `${parseFloat(topLoser.price_change_pct!).toFixed(1)}%` : "—"}
           sub={topLoser?.product_name?.split(" ").slice(-2).join(" ")}
           accent="red"
         />
       </div>
 
-      {/* ── Поиск + фильтры ── */}
       <div className="flex flex-col gap-3">
-
         {/* Поиск */}
         <div className="relative">
           <input
@@ -240,7 +219,6 @@ export default function DashboardPage() {
             className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
           />
 
-          {/* Dropdown */}
           {showDropdown && searchResults.length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-gray-700 rounded-xl overflow-hidden z-50 shadow-xl">
               {searchResults.map((product) => (
@@ -249,15 +227,13 @@ export default function DashboardPage() {
                   onMouseDown={() => handleSelectProduct(product)}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-800 transition-colors text-left"
                 >
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded font-medium ${
-                      product.category === "GPU"
-                        ? "bg-blue-900 text-blue-300"
-                        : product.category === "CPU"
-                        ? "bg-green-900 text-green-300"
-                        : "bg-purple-900 text-purple-300"
-                    }`}
-                  >
+                  <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                    product.category === "GPU"
+                      ? "bg-blue-900 text-blue-300"
+                      : product.category === "CPU"
+                      ? "bg-green-900 text-green-300"
+                      : "bg-purple-900 text-purple-300"
+                  }`}>
                     {product.category}
                   </span>
                   <span className="text-white text-sm">{product.name}</span>
@@ -272,32 +248,43 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Фильтры */}
-        <div className="flex flex-wrap gap-2">
-          {["GPU", "CPU", "RAM"].map((cat) => (
-            <CategoryChip
-              key={cat}
-              label={cat}
-              active={activeCategory === cat}
-              onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
-            />
-          ))}
-          <div className="w-px bg-gray-700 mx-1" />
-          {["NVIDIA", "AMD", "Intel"].map((brand) => (
-            <CategoryChip
-              key={brand}
-              label={brand}
-              active={activeBrand === brand}
-              onClick={() => setActiveBrand(activeBrand === brand ? null : brand)}
-            />
-          ))}
+        {/* Фильтры + кнопка Подробнее */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            {["GPU", "CPU", "RAM"].map((cat) => (
+              <CategoryChip
+                key={cat}
+                label={cat}
+                active={activeCategory === cat}
+                onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
+              />
+            ))}
+            <div className="w-px bg-gray-700 mx-1" />
+            {["NVIDIA", "AMD", "Intel"].map((brand) => (
+              <CategoryChip
+                key={brand}
+                label={brand}
+                active={activeBrand === brand}
+                onClick={() => setActiveBrand(activeBrand === brand ? null : brand)}
+              />
+            ))}
+          </div>
+
+          {/* Кнопка появляется только когда выбран продукт */}
+          {selectedProduct && (
+            <Link
+              href={`/product/${selectedProduct.product_id}`}
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm text-white transition-colors whitespace-nowrap"
+            >
+              Подробнее →
+            </Link>
+          )}
         </div>
       </div>
 
-      {/* ── Основной контент ── */}
+      {/* Основной контент */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-        {/* График — занимает 2/3 ширины */}
         <div className="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-xl p-5">
           {selectedProduct ? (
             <>
@@ -325,11 +312,8 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Таблица текущих цен — 1/3 ширины */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-          <div className="text-sm font-medium text-gray-300 mb-4">
-            Текущие цены
-          </div>
+          <div className="text-sm font-medium text-gray-300 mb-4">Текущие цены</div>
 
           {selectedProduct && currentPrices.length > 0 ? (
             <div className="flex flex-col gap-2">
@@ -347,16 +331,13 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <span className="text-white font-medium text-sm">
-                      ${parseFloat(price.price_usd).toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                      })}
+                      ${parseFloat(price.price_usd).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                     </span>
-                    {bestPrice !== null &&
-                      parseFloat(price.price_usd) === bestPrice && (
-                        <span className="text-xs bg-emerald-900 text-emerald-400 px-1.5 py-0.5 rounded">
-                          best
-                        </span>
-                      )}
+                    {bestPrice !== null && parseFloat(price.price_usd) === bestPrice && (
+                      <span className="text-xs bg-emerald-900 text-emerald-400 px-1.5 py-0.5 rounded">
+                        best
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -369,17 +350,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Движение цен ── */}
+      {/* Движение цен */}
       {topMovers.length > 0 && (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-          <div className="text-sm font-medium text-gray-300 mb-4">
-            Движение цен (7 дней)
-          </div>
+          <div className="text-sm font-medium text-gray-300 mb-4">Движение цен (7 дней)</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {topMovers.slice(0, 9).map((mover) => {
-              const pct = mover.price_change_pct
-                ? parseFloat(mover.price_change_pct)
-                : null;
+              const pct = mover.price_change_pct ? parseFloat(mover.price_change_pct) : null;
               const isUp = pct !== null && pct > 0;
               return (
                 <button
@@ -403,13 +380,8 @@ export default function DashboardPage() {
                     <div className="text-xs text-gray-500 mt-0.5">{mover.category} · {mover.brand}</div>
                   </div>
                   {pct !== null ? (
-                    <span
-                      className={`text-sm font-semibold ${
-                        isUp ? "text-red-400" : "text-emerald-400"
-                      }`}
-                    >
-                      {isUp ? "+" : ""}
-                      {pct.toFixed(1)}%
+                    <span className={`text-sm font-semibold ${isUp ? "text-red-400" : "text-emerald-400"}`}>
+                      {isUp ? "+" : ""}{pct.toFixed(1)}%
                     </span>
                   ) : (
                     <span className="text-gray-600 text-sm">—</span>
