@@ -2,35 +2,72 @@
 Prices router — эндпоинты для цен
 """
 
+import time
+import logging
 from fastapi import APIRouter, Query
 from typing import Optional
 from database import execute_query
+from schemas import PriceHistorySchema, CurrentPriceSchema, TopMoverSchema
 
+log = logging.getLogger(__name__)
 router = APIRouter(prefix="/prices", tags=["Prices"])
 
+# ─────────────────────────────────────────
+# Простой in-memory кеш
+# { "cache_key": {"data": [...], "expires_at": timestamp} }
+# ─────────────────────────────────────────
+_cache: dict = {}
+CACHE_TTL = 30 * 60  # 30 минут в секундах
 
-@router.get("/history/{product_id}")
+
+def _get_cached(key: str):
+    """Возвращает данные из кеша если не истекли"""
+    if key in _cache:
+        entry = _cache[key]
+        if time.time() < entry["expires_at"]:
+            log.debug(f"Cache hit: {key}")
+            return entry["data"]
+        else:
+            del _cache[key]
+    return None
+
+
+def _set_cache(key: str, data):
+    """Сохраняет данные в кеш на 30 минут"""
+    _cache[key] = {
+        "data": data,
+        "expires_at": time.time() + CACHE_TTL,
+    }
+    log.debug(f"Cache set: {key}")
+
+
+# ─────────────────────────────────────────
+# Эндпоинты
+# ─────────────────────────────────────────
+
+@router.get("/history/{product_id}", response_model=list[PriceHistorySchema])
 async def get_price_history(
     product_id: str,
-    days: int = Query(30, ge=1, le=365),
-    source_id: Optional[int] = None,
+    days: int = Query(30, ge=1, le=365, description="Период в днях"),
+    source_id: Optional[int] = Query(None, description="ID источника для фильтрации"),
 ):
     """
     История цены продукта за период.
     Используется для построения графика на фронте.
+    Возвращает массив точек: дата + цена + источник.
     """
     sql = """
         SELECT
-            date_id,
-            price_usd,
-            price_original,
-            currency,
-            ds.name        as source_name,
+            f.date_id,
+            f.price_usd,
+            f.price_original,
+            f.currency,
+            ds.name         as source_name,
             ds.display_name,
             ds.region
         FROM fact_price_history f
         JOIN dim_sources ds ON f.source_id = ds.source_id
-        WHERE f.product_id = %s
+        WHERE f.product_id = %s::uuid
           AND f.date_id >= CURRENT_DATE - INTERVAL '%s days'
     """
     params = [product_id, days]
@@ -39,20 +76,26 @@ async def get_price_history(
         sql += " AND f.source_id = %s"
         params.append(source_id)
 
-    sql += " ORDER BY date_id ASC, ds.region"
+    sql += " ORDER BY f.date_id ASC, ds.region"
 
     return execute_query(sql, params)
 
 
-@router.get("/current/{product_id}")
+@router.get("/current/{product_id}", response_model=list[CurrentPriceSchema])
 async def get_current_prices(product_id: str):
     """
     Текущие цены продукта по всем источникам.
+    Кешируется на 30 минут — данные меняются редко.
     Используется для таблицы магазинов на странице продукта.
     """
+    cache_key = f"current_prices:{product_id}"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+
     sql = """
         SELECT
-            product_id,
+            product_id::text,
             source_name,
             display_name,
             region,
@@ -60,21 +103,30 @@ async def get_current_prices(product_id: str):
             date_id,
             collected_at
         FROM mart_current_prices
-        WHERE product_id = %s
+        WHERE product_id = %s::uuid
         ORDER BY price_usd ASC
     """
-    return execute_query(sql, (product_id,))
+    data = execute_query(sql, (product_id,))
+    _set_cache(cache_key, data)
+    return data
 
 
-@router.get("/top-movers")
-async def get_top_movers(limit: int = Query(10, ge=1, le=50)):
+@router.get("/top-movers", response_model=list[TopMoverSchema])
+async def get_top_movers(
+    limit: int = Query(10, ge=1, le=50, description="Кол-во результатов"),
+):
     """
     Топ продуктов с наибольшим изменением цены за 7 дней.
     Используется для виджета на главной странице.
     """
+    cache_key = f"top_movers:{limit}"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+
     sql = """
         SELECT
-            product_id,
+            product_id::text,
             product_name,
             brand,
             category,
@@ -86,27 +138,30 @@ async def get_top_movers(limit: int = Query(10, ge=1, le=50)):
         ORDER BY ABS(price_change_pct) DESC
         LIMIT %s
     """
-    return execute_query(sql, (limit,))
+    data = execute_query(sql, (limit,))
+    _set_cache(cache_key, data)
+    return data
 
 
-@router.get("/changes")
+@router.get("/changes", response_model=list[TopMoverSchema])
 async def get_price_changes(
-    category: Optional[str] = None,
+    category: Optional[str] = Query(None, description="GPU, CPU, RAM"),
     limit: int = Query(20, ge=1, le=100),
 ):
     """
     Изменения цен по всем продуктам.
+    Используется для страницы с общей аналитикой.
     """
     sql = """
         SELECT
-            product_id,
+            product_id::text,
             product_name,
             brand,
             category,
             current_price,
+            previous_price,
             price_change_pct,
-            price_change_abs,
-            vs_msrp_pct
+            price_change_abs
         FROM mart_price_changes
         WHERE 1=1
     """
@@ -116,7 +171,7 @@ async def get_price_changes(
         sql += " AND category = %s"
         params.append(category.upper())
 
-    sql += " ORDER BY ABS(price_change_pct) DESC LIMIT %s"
+    sql += " ORDER BY ABS(price_change_pct) DESC NULLS LAST LIMIT %s"
     params.append(limit)
 
     return execute_query(sql, params)
