@@ -28,17 +28,12 @@ app = FastAPI(
 )
 
 # ─────────────────────────────────────────
-# CORS — разрешаем запросы с фронтенда
+# CORS — разрешаем запросы с любых доменов
 # ─────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://*.vercel.app",
-        "https://hardware-price-tracker.vercel.app",
-        "https://hardware-price-tracker-k8ovsldeh-hardware-price-tracker.vercel.app",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
