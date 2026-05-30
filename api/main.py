@@ -33,8 +33,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",        # Next.js локально
-        "https://*.vercel.app",         # Vercel деплой
+        "http://localhost:3000",
+        "https://*.vercel.app",
+        "https://hardware-price-tracker.vercel.app",
+        "https://hardware-price-tracker-k8ovsldeh-hardware-price-tracker.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
