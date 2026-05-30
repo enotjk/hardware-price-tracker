@@ -12,20 +12,14 @@ from schemas import PriceHistorySchema, CurrentPriceSchema, TopMoverSchema
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/prices", tags=["Prices"])
 
-# ─────────────────────────────────────────
-# Простой in-memory кеш
-# { "cache_key": {"data": [...], "expires_at": timestamp} }
-# ─────────────────────────────────────────
 _cache: dict = {}
-CACHE_TTL = 30 * 60  # 30 минут в секундах
+CACHE_TTL = 30 * 60
 
 
 def _get_cached(key: str):
-    """Возвращает данные из кеша если не истекли"""
     if key in _cache:
         entry = _cache[key]
         if time.time() < entry["expires_at"]:
-            log.debug(f"Cache hit: {key}")
             return entry["data"]
         else:
             del _cache[key]
@@ -33,29 +27,18 @@ def _get_cached(key: str):
 
 
 def _set_cache(key: str, data):
-    """Сохраняет данные в кеш на 30 минут"""
     _cache[key] = {
         "data": data,
         "expires_at": time.time() + CACHE_TTL,
     }
-    log.debug(f"Cache set: {key}")
 
-
-# ─────────────────────────────────────────
-# Эндпоинты
-# ─────────────────────────────────────────
 
 @router.get("/history/{product_id}", response_model=list[PriceHistorySchema])
 async def get_price_history(
     product_id: str,
-    days: int = Query(30, ge=1, le=365, description="Период в днях"),
-    source_id: Optional[int] = Query(None, description="ID источника для фильтрации"),
+    days: int = Query(30, ge=1, le=365),
+    source_id: Optional[int] = Query(None),
 ):
-    """
-    История цены продукта за период.
-    Используется для построения графика на фронте.
-    Возвращает массив точек: дата + цена + источник.
-    """
     sql = """
         SELECT
             f.date_id,
@@ -71,28 +54,19 @@ async def get_price_history(
           AND f.date_id >= CURRENT_DATE - INTERVAL '%s days'
     """
     params = [product_id, days]
-
     if source_id:
         sql += " AND f.source_id = %s"
         params.append(source_id)
-
     sql += " ORDER BY f.date_id ASC, ds.region"
-
     return execute_query(sql, params)
 
 
 @router.get("/current/{product_id}", response_model=list[CurrentPriceSchema])
 async def get_current_prices(product_id: str):
-    """
-    Текущие цены продукта по всем источникам.
-    Кешируется на 30 минут — данные меняются редко.
-    Используется для таблицы магазинов на странице продукта.
-    """
     cache_key = f"current_prices:{product_id}"
     cached = _get_cached(cache_key)
     if cached is not None:
         return cached
-
     sql = """
         SELECT
             product_id::text,
@@ -113,22 +87,17 @@ async def get_current_prices(product_id: str):
 
 @router.get("/top-movers", response_model=list[TopMoverSchema])
 async def get_top_movers(
-    limit: int = Query(10, ge=1, le=50, description="Кол-во результатов"),
+    limit: int = Query(10, ge=1, le=50),
 ):
-    """
-    Топ продуктов с наибольшим изменением цены за 7 дней.
-    Используется для виджета на главной странице.
-    """
     cache_key = f"top_movers:{limit}"
     cached = _get_cached(cache_key)
     if cached is not None:
         return cached
-
     sql = """
         SELECT
             product_id::text,
             product_name,
-            brand,
+            NULL::text as brand,
             category,
             current_price,
             previous_price,
@@ -145,18 +114,14 @@ async def get_top_movers(
 
 @router.get("/changes", response_model=list[TopMoverSchema])
 async def get_price_changes(
-    category: Optional[str] = Query(None, description="GPU, CPU, RAM"),
+    category: Optional[str] = Query(None),
     limit: int = Query(20, ge=1, le=100),
 ):
-    """
-    Изменения цен по всем продуктам.
-    Используется для страницы с общей аналитикой.
-    """
     sql = """
         SELECT
             product_id::text,
             product_name,
-            brand,
+            NULL::text as brand,
             category,
             current_price,
             previous_price,
@@ -166,12 +131,9 @@ async def get_price_changes(
         WHERE 1=1
     """
     params = []
-
     if category:
         sql += " AND category = %s"
         params.append(category.upper())
-
     sql += " ORDER BY ABS(price_change_pct) DESC NULLS LAST LIMIT %s"
     params.append(limit)
-
     return execute_query(sql, params)
