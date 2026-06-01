@@ -36,9 +36,10 @@ def _set_cache(key: str, data):
 @router.get("/history/{product_id}", response_model=list[PriceHistorySchema])
 async def get_price_history(
     product_id: str,
-    days: int = Query(30, ge=1, le=365),
-    source_id: Optional[int] = Query(None),
+    days: int = Query(30, ge=1, le=365, description="Период в днях"),
+    source_id: Optional[int] = Query(None, description="ID источника для фильтрации"),
 ):
+    """История цены продукта за период."""
     sql = """
         SELECT
             f.date_id,
@@ -63,10 +64,12 @@ async def get_price_history(
 
 @router.get("/current/{product_id}", response_model=list[CurrentPriceSchema])
 async def get_current_prices(product_id: str):
+    """Текущие цены продукта по всем источникам."""
     cache_key = f"current_prices:{product_id}"
     cached = _get_cached(cache_key)
     if cached is not None:
         return cached
+
     sql = """
         SELECT
             product_id::text,
@@ -88,12 +91,14 @@ async def get_current_prices(product_id: str):
 
 @router.get("/top-movers", response_model=list[TopMoverSchema])
 async def get_top_movers(
-    limit: int = Query(10, ge=1, le=50),
+    limit: int = Query(10, ge=1, le=50, description="Кол-во результатов"),
 ):
+    """Топ продуктов с наибольшим изменением цены за 7 дней."""
     cache_key = f"top_movers:{limit}"
     cached = _get_cached(cache_key)
     if cached is not None:
         return cached
+
     sql = """
         SELECT
             product_id::text,
@@ -101,11 +106,11 @@ async def get_top_movers(
             NULL::text as brand,
             category,
             current_price,
-            previous_price,
-            price_change_pct,
-            price_change_abs
+            price_7d_ago        as previous_price,
+            change_7d_pct       as price_change_pct,
+            (current_price - price_7d_ago) as price_change_abs
         FROM mart_top_movers
-        ORDER BY ABS(price_change_pct) DESC
+        ORDER BY ABS(change_7d_pct) DESC NULLS LAST
         LIMIT %s
     """
     data = execute_query(sql, (limit,))
@@ -115,9 +120,10 @@ async def get_top_movers(
 
 @router.get("/changes", response_model=list[TopMoverSchema])
 async def get_price_changes(
-    category: Optional[str] = Query(None),
+    category: Optional[str] = Query(None, description="GPU, CPU, RAM"),
     limit: int = Query(20, ge=1, le=100),
 ):
+    """Изменения цен по всем продуктам."""
     sql = """
         SELECT
             product_id::text,
@@ -125,16 +131,19 @@ async def get_price_changes(
             NULL::text as brand,
             category,
             current_price,
-            previous_price,
-            price_change_pct,
-            price_change_abs
+            price_7d_ago        as previous_price,
+            change_7d_pct       as price_change_pct,
+            (current_price - price_7d_ago) as price_change_abs
         FROM mart_price_changes
         WHERE 1=1
     """
     params = []
+
     if category:
         sql += " AND category = %s"
         params.append(category.upper())
-    sql += " ORDER BY ABS(price_change_pct) DESC NULLS LAST LIMIT %s"
+
+    sql += " ORDER BY ABS(change_7d_pct) DESC NULLS LAST LIMIT %s"
     params.append(limit)
+
     return execute_query(sql, params)
