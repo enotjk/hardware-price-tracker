@@ -2,17 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import PriceChart from "@/components/PriceChart";
 import {
-  getProducts,
-  searchProducts,
-  getPriceHistory,
-  getCurrentPrices,
   getPipelineStats,
   getPriceChanges,
+  searchProducts,
   Product,
-  PriceHistory,
-  CurrentPrice,
   Stats,
   TopMover,
 } from "@/lib/api";
@@ -21,43 +15,24 @@ import {
 // Вспомогательные компоненты
 // ─────────────────────────────────────────
 
-function MetricCard({
-  label,
-  value,
-  sub,
-  accent,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  accent?: "green" | "red" | "blue";
+function MetricCard({ label, value, sub, accent }: {
+  label: string; value: string; sub?: string; accent?: "green" | "red" | "blue";
 }) {
-  const accentClass =
-    accent === "green"
-      ? "text-emerald-400"
-      : accent === "red"
-      ? "text-red-400"
-      : accent === "blue"
-      ? "text-blue-400"
-      : "text-white";
-
+  const color = accent === "green" ? "text-emerald-400"
+    : accent === "red" ? "text-red-400"
+    : accent === "blue" ? "text-blue-400"
+    : "text-white";
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
       <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">{label}</div>
-      <div className={`text-2xl font-semibold ${accentClass}`}>{value}</div>
+      <div className={`text-2xl font-semibold ${color}`}>{value}</div>
       {sub && <div className="text-xs text-gray-500 mt-1">{sub}</div>}
     </div>
   );
 }
 
-function CategoryChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
+function CategoryChip({ label, active, onClick }: {
+  label: string; active: boolean; onClick: () => void;
 }) {
   return (
     <button
@@ -73,37 +48,50 @@ function CategoryChip({
   );
 }
 
-const FLAG: Record<string, string> = {
-  US: "🇺🇸",
-  DE: "🇩🇪",
-  UK: "🇬🇧",
-};
+function PriceChangeBadge({ pct }: { pct: string | null }) {
+  if (!pct) return <span className="text-gray-600 text-sm">—</span>;
+  const val = parseFloat(pct);
+  const isUp = val > 0;
+  return (
+    <span className={`text-sm font-semibold ${isUp ? "text-red-400" : "text-emerald-400"}`}>
+      {isUp ? "+" : ""}{val.toFixed(1)}%
+    </span>
+  );
+}
 
 // ─────────────────────────────────────────
 // Главная страница
 // ─────────────────────────────────────────
-
 export default function DashboardPage() {
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [allMovers, setAllMovers] = useState<TopMover[]>([]);
+  const [filteredMovers, setFilteredMovers] = useState<TopMover[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [activeBrand, setActiveBrand] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const [priceHistory, setPriceHistory] = useState<PriceHistory[]>([]);
-  const [currentPrices, setCurrentPrices] = useState<CurrentPrice[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [topMovers, setTopMovers] = useState<TopMover[]>([]);
-  const [historyDays, setHistoryDays] = useState(30);
-
-  const [loadingHistory, setLoadingHistory] = useState(false);
-
+  // Загрузка данных
   useEffect(() => {
     getPipelineStats().then(setStats).catch(console.error);
-    getPriceChanges().then(setTopMovers).catch(console.error);
+    getPriceChanges(undefined).then((data) => {
+      setAllMovers(data);
+      setFilteredMovers(data);
+      setLoading(false);
+    }).catch(console.error);
   }, []);
 
+  // Фильтрация по категории
+  useEffect(() => {
+    if (!activeCategory) {
+      setFilteredMovers(allMovers);
+    } else {
+      setFilteredMovers(allMovers.filter(m => m.category === activeCategory));
+    }
+  }, [activeCategory, allMovers]);
+
+  // Поиск с дебаунсом
   useEffect(() => {
     if (searchQuery.length < 2) {
       setSearchResults([]);
@@ -122,37 +110,6 @@ export default function DashboardPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const loadProductData = useCallback(
-    async (product: Product, days: number) => {
-      setLoadingHistory(true);
-      try {
-        const [history, prices] = await Promise.all([
-          getPriceHistory(product.product_id, days),
-          getCurrentPrices(product.product_id),
-        ]);
-        setPriceHistory(history);
-        setCurrentPrices(prices);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoadingHistory(false);
-      }
-    },
-    []
-  );
-
-  const handleSelectProduct = (product: Product) => {
-    setSelectedProduct(product);
-    setSearchQuery(product.name);
-    setShowDropdown(false);
-    loadProductData(product, historyDays);
-  };
-
-  const handlePeriodChange = (days: number) => {
-    setHistoryDays(days);
-    if (selectedProduct) loadProductData(selectedProduct, days);
-  };
-
   const formatLastUpdate = (iso: string | null) => {
     if (!iso) return "—";
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -161,25 +118,21 @@ export default function DashboardPage() {
     return `${Math.floor(diff / 1440)} д назад`;
   };
 
-  const bestPrice = currentPrices.length
-    ? Math.min(...currentPrices.map((p) => parseFloat(p.price_usd)))
-    : null;
-
-  const topGainer = topMovers
-    .filter((m) => m.price_change_pct && parseFloat(m.price_change_pct) > 0)
+  const topGainer = [...allMovers].filter(m => m.price_change_pct && parseFloat(m.price_change_pct) > 0)
     .sort((a, b) => parseFloat(b.price_change_pct!) - parseFloat(a.price_change_pct!))[0];
-  const topLoser = topMovers
-    .filter((m) => m.price_change_pct && parseFloat(m.price_change_pct) < 0)
+  const topLoser = [...allMovers].filter(m => m.price_change_pct && parseFloat(m.price_change_pct) < 0)
     .sort((a, b) => parseFloat(a.price_change_pct!) - parseFloat(b.price_change_pct!))[0];
 
   return (
     <div className="flex flex-col gap-6">
 
+      {/* Заголовок */}
       <div>
         <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
         <p className="text-gray-400 text-sm mt-1">Цены на GPU, CPU, RAM — США и Европа</p>
       </div>
 
+      {/* Метрики */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard
           label="Отслеживается"
@@ -196,202 +149,124 @@ export default function DashboardPage() {
           label="Макс. рост (7д)"
           value={topGainer ? `+${parseFloat(topGainer.price_change_pct!).toFixed(1)}%` : "—"}
           sub={topGainer?.product_name?.split(" ").slice(-2).join(" ")}
-          accent="green"
+          accent="red"
         />
         <MetricCard
           label="Макс. падение (7д)"
           value={topLoser ? `${parseFloat(topLoser.price_change_pct!).toFixed(1)}%` : "—"}
           sub={topLoser?.product_name?.split(" ").slice(-2).join(" ")}
-          accent="red"
+          accent="green"
         />
       </div>
 
-      <div className="flex flex-col gap-3">
-        {/* Поиск */}
-        <div className="relative">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
-            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-            placeholder="Найти продукт: RTX 4090, Ryzen 9, DDR5..."
-            className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+      {/* Поиск */}
+      <div className="relative">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+          placeholder="Найти продукт: RTX 4090, Ryzen 9, DDR5..."
+          className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+        />
+        {showDropdown && searchResults.length > 0 && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-gray-700 rounded-xl overflow-hidden z-50 shadow-xl">
+            {searchResults.map((product) => (
+              <Link
+                key={product.product_id}
+                href={`/product/${product.product_id}`}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-gray-800 transition-colors"
+              >
+                <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                  product.category === "GPU" ? "bg-blue-900 text-blue-300"
+                  : product.category === "CPU" ? "bg-green-900 text-green-300"
+                  : "bg-purple-900 text-purple-300"
+                }`}>
+                  {product.category}
+                </span>
+                <span className="text-white text-sm">{product.name}</span>
+                {product.msrp_usd && (
+                  <span className="ml-auto text-gray-400 text-xs">MSRP ${product.msrp_usd}</span>
+                )}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Фильтры */}
+      <div className="flex flex-wrap gap-2">
+        {["GPU", "CPU", "RAM"].map((cat) => (
+          <CategoryChip
+            key={cat}
+            label={cat}
+            active={activeCategory === cat}
+            onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
           />
+        ))}
+      </div>
 
-          {showDropdown && searchResults.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-gray-700 rounded-xl overflow-hidden z-50 shadow-xl">
-              {searchResults.map((product) => (
-                <button
-                  key={product.product_id}
-                  onMouseDown={() => handleSelectProduct(product)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-800 transition-colors text-left"
+      {/* Список продуктов */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-800">
+          <h2 className="text-sm font-medium text-gray-300">
+            Все продукты
+            {activeCategory && <span className="text-gray-500 ml-2">· {activeCategory}</span>}
+          </h2>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-gray-500 text-sm">
+            Загрузка...
+          </div>
+        ) : filteredMovers.length === 0 ? (
+          <div className="flex items-center justify-center py-16 text-gray-600 text-sm">
+            Нет данных
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-800">
+                <th className="text-left text-gray-500 font-normal px-5 py-3">Продукт</th>
+                <th className="text-left text-gray-500 font-normal px-3 py-3">Категория</th>
+                <th className="text-right text-gray-500 font-normal px-3 py-3">Цена</th>
+                <th className="text-right text-gray-500 font-normal px-5 py-3">Изм. 7д</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-800">
+              {filteredMovers.map((mover, i) => (
+                <tr
+                  key={`${mover.product_id}-${i}`}
+                  className="hover:bg-gray-800/50 transition-colors cursor-pointer"
+                  onClick={() => window.location.href = `/product/${mover.product_id}`}
                 >
-                  <span className={`text-xs px-2 py-0.5 rounded font-medium ${
-                    product.category === "GPU"
-                      ? "bg-blue-900 text-blue-300"
-                      : product.category === "CPU"
-                      ? "bg-green-900 text-green-300"
+                  <td className="px-5 py-3">
+                    <span className="text-white font-medium">{mover.product_name}</span>
+                  </td>
+                  <td className="px-3 py-3">
+                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                      mover.category === "GPU" ? "bg-blue-900 text-blue-300"
+                      : mover.category === "CPU" ? "bg-green-900 text-green-300"
                       : "bg-purple-900 text-purple-300"
-                  }`}>
-                    {product.category}
-                  </span>
-                  <span className="text-white text-sm">{product.name}</span>
-                  {product.msrp_usd && (
-                    <span className="ml-auto text-gray-400 text-xs">
-                      MSRP ${product.msrp_usd}
+                    }`}>
+                      {mover.category}
                     </span>
-                  )}
-                </button>
+                  </td>
+                  <td className="px-3 py-3 text-right text-white">
+                    {mover.current_price
+                      ? `$${parseFloat(mover.current_price).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                      : "—"}
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <PriceChangeBadge pct={mover.price_change_pct} />
+                  </td>
+                </tr>
               ))}
-            </div>
-          )}
-        </div>
-
-        {/* Фильтры + кнопка Подробнее */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-2">
-            {["GPU", "CPU", "RAM"].map((cat) => (
-              <CategoryChip
-                key={cat}
-                label={cat}
-                active={activeCategory === cat}
-                onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
-              />
-            ))}
-            <div className="w-px bg-gray-700 mx-1" />
-            {["NVIDIA", "AMD", "Intel"].map((brand) => (
-              <CategoryChip
-                key={brand}
-                label={brand}
-                active={activeBrand === brand}
-                onClick={() => setActiveBrand(activeBrand === brand ? null : brand)}
-              />
-            ))}
-          </div>
-
-          {/* Кнопка появляется только когда выбран продукт */}
-          {selectedProduct && (
-            <Link
-              href={`/product/${selectedProduct.product_id}`}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm text-white transition-colors whitespace-nowrap"
-            >
-              Подробнее →
-            </Link>
-          )}
-        </div>
+            </tbody>
+          </table>
+        )}
       </div>
-
-      {/* Основной контент */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-        <div className="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-xl p-5">
-          {selectedProduct ? (
-            <>
-              <div className="mb-4">
-                <div className="text-lg font-medium text-white">{selectedProduct.name}</div>
-                <div className="text-sm text-gray-400 mt-0.5">
-                  {selectedProduct.category}
-                  {selectedProduct.msrp_usd && ` · MSRP $${selectedProduct.msrp_usd}`}
-                </div>
-              </div>
-              <PriceChart
-                data={priceHistory}
-                msrp={selectedProduct.msrp_usd ? parseFloat(selectedProduct.msrp_usd) : undefined}
-                onPeriodChange={handlePeriodChange}
-                isLoading={loadingHistory}
-              />
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-64 gap-3">
-              <div className="text-gray-500 text-4xl">📊</div>
-              <div className="text-gray-400 text-sm">
-                Найди продукт через поиск чтобы увидеть график цены
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-          <div className="text-sm font-medium text-gray-300 mb-4">Текущие цены</div>
-
-          {selectedProduct && currentPrices.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              {currentPrices.map((price) => (
-                <div
-                  key={`${price.source_name}-${price.region}`}
-                  className="flex items-center justify-between p-3 bg-gray-800 rounded-lg"
-                >
-                  <div>
-                    <div className="flex items-center gap-1.5 text-sm text-gray-200">
-                      <span>{FLAG[price.region] ?? "🌍"}</span>
-                      <span>{price.display_name}</span>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-0.5">{price.date_id}</div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-white font-medium text-sm">
-                      ${parseFloat(price.price_usd).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                    </span>
-                    {bestPrice !== null && parseFloat(price.price_usd) === bestPrice && (
-                      <span className="text-xs bg-emerald-900 text-emerald-400 px-1.5 py-0.5 rounded">
-                        best
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-48 text-gray-600 text-sm">
-              {selectedProduct ? "Загрузка..." : "Выбери продукт"}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Движение цен */}
-      {topMovers.length > 0 && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-          <div className="text-sm font-medium text-gray-300 mb-4">Движение цен (7 дней)</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {topMovers.slice(0, 9).map((mover) => {
-              const pct = mover.price_change_pct ? parseFloat(mover.price_change_pct) : null;
-              const isUp = pct !== null && pct > 0;
-              return (
-                <button
-                  key={mover.product_id}
-                  onClick={() =>
-                    handleSelectProduct({
-                      product_id: mover.product_id,
-                      name: mover.product_name,
-                      brand: mover.brand,
-                      category: mover.category,
-                      model_number: null,
-                      msrp_usd: null,
-                    })
-                  }
-                  className="flex items-center justify-between p-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors text-left"
-                >
-                  <div>
-                    <div className="text-sm text-white font-medium truncate max-w-[150px]">
-                      {mover.product_name}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-0.5">{mover.category} · {mover.brand}</div>
-                  </div>
-                  {pct !== null ? (
-                    <span className={`text-sm font-semibold ${isUp ? "text-red-400" : "text-emerald-400"}`}>
-                      {isUp ? "+" : ""}{pct.toFixed(1)}%
-                    </span>
-                  ) : (
-                    <span className="text-gray-600 text-sm">—</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
