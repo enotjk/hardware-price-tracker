@@ -76,7 +76,7 @@ class CurrentPriceSchema(BaseModel):
 class TopMoverSchema(BaseModel):
     product_id: str
     product_name: str
-    brand: str
+    brand: Optional[str] = None
     category: str
     current_price: Optional[Decimal] = None
     previous_price: Optional[Decimal] = None
