@@ -13,14 +13,8 @@ import {
   CurrentPrice,
 } from "@/lib/api";
 
-// ─────────────────────────────────────────
-// Флаги регионов
-// ─────────────────────────────────────────
 const FLAG: Record<string, string> = { US: "🇺🇸", DE: "🇩🇪", UK: "🇬🇧" };
 
-// ─────────────────────────────────────────
-// Вспомогательные компоненты
-// ─────────────────────────────────────────
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="bg-gray-800 rounded-xl p-4 flex flex-col gap-1">
@@ -50,25 +44,17 @@ function Breadcrumbs({ product }: { product: Product }) {
   );
 }
 
-// ─────────────────────────────────────────
-// Вычисление статистики из истории цен
-// ─────────────────────────────────────────
 function calcStats(history: PriceHistory[], msrp: number | null) {
   if (!history.length) return null;
-
   const prices = history.map((h) => parseFloat(h.price_usd));
   const min = Math.min(...prices);
   const max = Math.max(...prices);
   const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
   const current = prices[prices.length - 1];
   const vsMsrp = msrp ? ((current - msrp) / msrp) * 100 : null;
-
   return { min, max, avg, current, vsMsrp };
 }
 
-// ─────────────────────────────────────────
-// Главный компонент
-// ─────────────────────────────────────────
 export default function ProductPage() {
   const params = useParams();
   const router = useRouter();
@@ -81,14 +67,12 @@ export default function ProductPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  // Загружаем продукт
   useEffect(() => {
     getProduct(productId)
       .then(setProduct)
       .catch(() => setError(true));
   }, [productId]);
 
-  // Загружаем цены
   useEffect(() => {
     if (!product) return;
     setLoading(true);
@@ -133,14 +117,13 @@ export default function ProductPage() {
   return (
     <div className="flex flex-col gap-6">
 
-      {/* ── Хлебные крошки ── */}
+      {/* Хлебные крошки */}
       <Breadcrumbs product={product} />
 
-      {/* ── Заголовок продукта ── */}
+      {/* Заголовок продукта */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
-            {/* Категория + бренд */}
             <div className="flex items-center gap-2 mb-2">
               <span className={`text-xs px-2 py-0.5 rounded font-medium ${
                 product.category === "GPU"
@@ -158,11 +141,7 @@ export default function ProductPage() {
                 </span>
               )}
             </div>
-
-            {/* Название */}
             <h1 className="text-2xl font-semibold text-white">{product.name}</h1>
-
-            {/* Характеристики */}
             <div className="flex flex-wrap gap-3 mt-3">
               {product.msrp_usd && (
                 <div className="text-sm text-gray-400">
@@ -187,7 +166,6 @@ export default function ProductPage() {
             </div>
           </div>
 
-          {/* Текущая лучшая цена */}
           {bestPrice && (
             <div className="text-right">
               <div className="text-xs text-gray-500 mb-1">Лучшая цена сейчас</div>
@@ -205,7 +183,7 @@ export default function ProductPage() {
         </div>
       </div>
 
-      {/* ── График цены ── */}
+      {/* График цены */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
         <h2 className="text-sm font-medium text-gray-300 mb-4">История цены</h2>
         <PriceChart
@@ -216,7 +194,7 @@ export default function ProductPage() {
         />
       </div>
 
-      {/* ── Статистика за период ── */}
+      {/* Статистика */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard
@@ -244,7 +222,7 @@ export default function ProductPage() {
         </div>
       )}
 
-      {/* ── Таблица магазинов ── */}
+      {/* Таблица магазинов */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
         <h2 className="text-sm font-medium text-gray-300 mb-4">Сравнение цен по магазинам</h2>
 
@@ -295,7 +273,18 @@ export default function ProductPage() {
                             : "—"}
                         </td>
                         <td className="py-3 text-right">
-                          <span className="text-xs text-gray-600 italic">нет ссылки</span>
+                          {price.product_url ? (
+                            <a
+                              href={price.product_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                            >
+                              Открыть →
+                            </a>
+                          ) : (
+                            <span className="text-xs text-gray-600 italic">нет ссылки</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -310,7 +299,7 @@ export default function ProductPage() {
         )}
       </div>
 
-      {/* ── Назад ── */}
+      {/* Назад */}
       <div>
         <button
           onClick={() => router.back()}

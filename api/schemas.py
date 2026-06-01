@@ -67,6 +67,7 @@ class CurrentPriceSchema(BaseModel):
     price_usd: Decimal
     date_id: date
     collected_at: Optional[datetime] = None
+    product_url: Optional[str] = None
 
     class Config:
         from_attributes = True

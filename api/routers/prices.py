@@ -75,7 +75,8 @@ async def get_current_prices(product_id: str):
             region,
             price_usd,
             date_id,
-            collected_at
+            collected_at,
+            product_url
         FROM mart_current_prices
         WHERE product_id = %s::uuid
         ORDER BY price_usd ASC

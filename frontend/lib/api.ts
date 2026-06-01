@@ -72,6 +72,17 @@ export interface Stats {
   failed_runs: number;
 }
 
+export interface CurrentPrice {
+  product_id: string;
+  source_name: string;
+  display_name: string;
+  region: string;
+  price_usd: string;
+  date_id: string;
+  collected_at: string | null;
+  product_url: string | null;
+}
+
 // ─────────────────────────────────────────
 // Базовый fetch с обработкой ошибок
 // ─────────────────────────────────────────
