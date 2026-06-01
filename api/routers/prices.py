@@ -71,7 +71,7 @@ async def get_current_prices(product_id: str):
         SELECT
             product_id::text,
             source_name,
-            display_name,
+            source_name as display_name,
             region,
             price_usd,
             date_id,
