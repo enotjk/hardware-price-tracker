@@ -8,6 +8,7 @@ Amazon клиент через RapidAPI (Real-Time Amazon Data)
 - Из результатов парсим все найденные продукты за раз
 - Итого: ~6 запросов за запуск (3 категории × 2 региона US/DE)
 """
+from __future__ import annotations
 
 import os
 import time
