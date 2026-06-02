@@ -1,9 +1,5 @@
 """
 Pydantic схемы — описывают структуру данных которые API принимает и возвращает.
-Зачем нужны:
-- Автоматическая валидация данных из БД
-- Красивая документация в Swagger UI
-- Автодополнение в IDE на фронтенде (TypeScript типы генерируются из них)
 """
 
 from pydantic import BaseModel
@@ -12,9 +8,6 @@ from datetime import date, datetime
 from decimal import Decimal
 
 
-# ─────────────────────────────────────────
-# Products
-# ─────────────────────────────────────────
 class ProductSchema(BaseModel):
     product_id: str
     name: str
@@ -43,9 +36,6 @@ class ProductListSchema(BaseModel):
         from_attributes = True
 
 
-# ─────────────────────────────────────────
-# Prices
-# ─────────────────────────────────────────
 class PriceHistorySchema(BaseModel):
     date_id: date
     price_usd: Decimal
@@ -87,9 +77,6 @@ class TopMoverSchema(BaseModel):
         from_attributes = True
 
 
-# ─────────────────────────────────────────
-# Pipelines
-# ─────────────────────────────────────────
 class PipelineSchema(BaseModel):
     dag_id: str
     status: str
@@ -98,6 +85,7 @@ class PipelineSchema(BaseModel):
     records_fetched: Optional[int] = None
     records_inserted: Optional[int] = None
     error_message: Optional[str] = None
+    api_requests_used: Optional[int] = None  # ← новое
 
     class Config:
         from_attributes = True
@@ -110,6 +98,7 @@ class StatsSchema(BaseModel):
     last_collected_at: Optional[datetime] = None
     successful_runs: int
     failed_runs: int
+    amazon_requests_this_month: Optional[int] = None  # ← новое
 
     class Config:
         from_attributes = True
