@@ -8,6 +8,9 @@ from schemas import PipelineSchema, StatsSchema
 
 router = APIRouter(prefix="/pipelines", tags=["Pipelines"])
 
+# DAGи которые не показываем на мониторе
+HIDDEN_DAGS = ('dag_test', 'dag_hello')
+
 
 @router.get("", response_model=list[PipelineSchema])
 async def get_pipelines():
@@ -22,9 +25,10 @@ async def get_pipelines():
             error_message,
             api_requests_used
         FROM etl_runs
+        WHERE dag_id NOT IN %s
         ORDER BY dag_id, started_at DESC
     """
-    return execute_query(sql)
+    return execute_query(sql, (HIDDEN_DAGS,))
 
 
 @router.get("/stats", response_model=StatsSchema)
