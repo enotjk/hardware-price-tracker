@@ -61,6 +61,7 @@ export interface Pipeline {
   records_fetched: number | null;
   records_inserted: number | null;
   error_message: string | null;
+  api_requests_used?: number | null;
 }
 
 export interface Stats {
@@ -70,6 +71,7 @@ export interface Stats {
   last_collected_at: string | null;
   successful_runs: number;
   failed_runs: number;
+  amazon_requests_this_month?: number;
 }
 
 export interface CurrentPrice {

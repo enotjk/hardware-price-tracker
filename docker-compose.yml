@@ -78,6 +78,9 @@ services:
       EBAY_CLIENT_ID: ${EBAY_CLIENT_ID}
       EBAY_CLIENT_SECRET: ${EBAY_CLIENT_SECRET}
       EBAY_ENVIRONMENT: production
+      #amazon
+      RAPIDAPI_KEY: ${RAPIDAPI_KEY}
+      RAPIDAPI_AMAZON_HOST: ${RAPIDAPI_AMAZON_HOST}
       # Exchange rates
       EXCHANGE_RATE_API_KEY: ${EXCHANGE_RATE_API_KEY}
       # Database
@@ -116,6 +119,9 @@ services:
       EBAY_CLIENT_ID: ${EBAY_CLIENT_ID}
       EBAY_CLIENT_SECRET: ${EBAY_CLIENT_SECRET}
       EBAY_ENVIRONMENT: production
+      # amazon
+      RAPIDAPI_KEY: ${RAPIDAPI_KEY}
+      RAPIDAPI_AMAZON_HOST: ${RAPIDAPI_AMAZON_HOST}
       # Exchange rates
       EXCHANGE_RATE_API_KEY: ${EXCHANGE_RATE_API_KEY}
       # Database
@@ -148,6 +154,9 @@ services:
       EBAY_CLIENT_ID: ${EBAY_CLIENT_ID}
       EBAY_CLIENT_SECRET: ${EBAY_CLIENT_SECRET}
       EBAY_ENVIRONMENT: production
+      # amazon
+      RAPIDAPI_KEY: ${RAPIDAPI_KEY}
+      RAPIDAPI_AMAZON_HOST: ${RAPIDAPI_AMAZON_HOST}
       # Exchange rates
       EXCHANGE_RATE_API_KEY: ${EXCHANGE_RATE_API_KEY}
       # Database
@@ -182,6 +191,9 @@ services:
       EBAY_CLIENT_ID: ${EBAY_CLIENT_ID}
       EBAY_CLIENT_SECRET: ${EBAY_CLIENT_SECRET}
       EBAY_ENVIRONMENT: production
+      # amazon
+      RAPIDAPI_KEY: ${RAPIDAPI_KEY}
+      RAPIDAPI_AMAZON_HOST: ${RAPIDAPI_AMAZON_HOST}
       # Exchange rates
       EXCHANGE_RATE_API_KEY: ${EXCHANGE_RATE_API_KEY}
       # Database

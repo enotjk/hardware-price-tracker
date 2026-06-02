@@ -11,10 +11,6 @@ router = APIRouter(prefix="/pipelines", tags=["Pipelines"])
 
 @router.get("", response_model=list[PipelineSchema])
 async def get_pipelines():
-    """
-    Список всех DAGов с последним статусом.
-    Используется для карточек на странице ETL монитора.
-    """
     sql = """
         SELECT DISTINCT ON (dag_id)
             dag_id,
@@ -23,7 +19,8 @@ async def get_pipelines():
             finished_at,
             records_fetched,
             records_inserted,
-            error_message
+            error_message,
+            api_requests_used
         FROM etl_runs
         ORDER BY dag_id, started_at DESC
     """
@@ -32,18 +29,18 @@ async def get_pipelines():
 
 @router.get("/stats", response_model=StatsSchema)
 async def get_stats():
-    """
-    Общая статистика системы.
-    Используется для заголовка страницы ETL монитора.
-    """
     sql = """
         SELECT
-            (SELECT COUNT(*) FROM fact_price_history)::int            as total_price_records,
-            (SELECT COUNT(*) FROM raw_prices)::int                     as total_raw_records,
-            (SELECT COUNT(*) FROM dim_products WHERE is_active = true)::int as tracked_products,
-            (SELECT MAX(collected_at) FROM fact_price_history)         as last_collected_at,
-            (SELECT COUNT(*) FROM etl_runs WHERE status = 'success')::int  as successful_runs,
-            (SELECT COUNT(*) FROM etl_runs WHERE status = 'failed')::int   as failed_runs
+            (SELECT COUNT(*) FROM fact_price_history)::int                      AS total_price_records,
+            (SELECT COUNT(*) FROM raw_prices)::int                              AS total_raw_records,
+            (SELECT COUNT(*) FROM dim_products WHERE is_active = true)::int     AS tracked_products,
+            (SELECT MAX(collected_at) FROM fact_price_history)                  AS last_collected_at,
+            (SELECT COUNT(*) FROM etl_runs WHERE status = 'success')::int       AS successful_runs,
+            (SELECT COUNT(*) FROM etl_runs WHERE status = 'failed')::int        AS failed_runs,
+            (SELECT COALESCE(SUM(api_requests_used), 0)
+             FROM etl_runs
+             WHERE dag_id = 'dag_amazon'
+               AND started_at >= date_trunc('month', NOW()))::int               AS amazon_requests_this_month
     """
     rows = execute_query(sql)
     return rows[0] if rows else {}
@@ -51,10 +48,6 @@ async def get_stats():
 
 @router.get("/{dag_id}/runs", response_model=list[PipelineSchema])
 async def get_dag_runs(dag_id: str, limit: int = 10):
-    """
-    История последних запусков конкретного DAG.
-    Используется для таблицы логов на странице ETL монитора.
-    """
     sql = """
         SELECT
             dag_id,
@@ -63,7 +56,8 @@ async def get_dag_runs(dag_id: str, limit: int = 10):
             finished_at,
             records_fetched,
             records_inserted,
-            error_message
+            error_message,
+            api_requests_used
         FROM etl_runs
         WHERE dag_id = %s
         ORDER BY started_at DESC
