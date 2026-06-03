@@ -230,12 +230,7 @@ class AmazonClient:
             product.get("product_original_price") or
             "0"
         )
-        # Убираем символы валюты и запятые: "$1,749.99" → 1749.99
-        price_clean = price_str.replace("$", "").replace("€", "").replace(",", "").strip()
-        try:
-            price = float(price_clean)
-        except (ValueError, AttributeError):
-            price = 0.0
+        price = self._parse_price(price_str, currency)
 
         # URL продукта
         asin = product.get("asin", "")
@@ -255,6 +250,25 @@ class AmazonClient:
             rating=float(product.get("product_star_rating") or 0) or None,
             reviews_count=int(product.get("product_num_ratings") or 0) or None,
         )
+
+    @staticmethod
+    def _parse_price(price_str: str, currency: str) -> float:
+        """
+        Парсит цену с учётом формата региона.
+        US/USD: "1,749.99" — запятая тысяч, точка десятичная
+        DE/EUR: "1.749,99" — точка тысяч, запятая десятичная
+        """
+        s = price_str.replace("$", "").replace("€", "").strip()
+        try:
+            if currency == "EUR":
+                # Европейский формат: убираем точки-разделители тысяч, заменяем запятую на точку
+                s = s.replace(".", "").replace(",", ".")
+            else:
+                # Американский формат: убираем запятые-разделители тысяч
+                s = s.replace(",", "")
+            return float(s)
+        except (ValueError, AttributeError):
+            return 0.0
 
     @staticmethod
     def _has_price(product: dict) -> bool:
